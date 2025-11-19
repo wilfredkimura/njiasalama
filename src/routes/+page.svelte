@@ -1,17 +1,9 @@
 <script>
     import Map from "$lib/components/Map.svelte";
-    import HazardSheet from "$lib/components/HazardSheet.svelte";
-    import { onMount } from "svelte";
-    import { fetchHazards } from "$lib/stores/hazardStore";
-
-    onMount(() => {
-        fetchHazards();
-    });
 </script>
 
 <div class="w-full h-screen relative overflow-hidden">
     <Map />
-    <HazardSheet />
 
     <!-- Floating Action Button for Reporting -->
     <a

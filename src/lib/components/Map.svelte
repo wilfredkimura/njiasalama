@@ -17,13 +17,19 @@
     let startMarker = null;
     /** @type {import('leaflet').Marker | null} */
     let endMarker = null;
+    /** @type {import('leaflet').Marker | null} */
+    let hazardMarker = null;
+    /** @type {import('svelte/store').Unsubscriber} */
+    let unsubscribeHazards;
 
     // Props for pin dropping
-    export let pinDropMode = "none"; // 'none' | 'start' | 'end'
+    export let pinDropMode = "none"; // 'none' | 'start' | 'end' | 'hazard'
     /** @type {{name: string, lat: number, lng: number} | null} */
     export let startLocation = null;
     /** @type {{name: string, lat: number, lng: number} | null} */
     export let endLocation = null;
+    /** @type {{lat: number, lng: number} | null} */
+    export let hazardLocation = null;
 
     onMount(async () => {
         if (browser) {
@@ -56,7 +62,9 @@
             });
 
             // Subscribe to hazards and update markers
-            hazards.subscribe((currentHazards) => {
+            unsubscribeHazards = hazards.subscribe((currentHazards) => {
+                if (!map) return;
+
                 // Clear existing hazard markers only
                 map.eachLayer(
                     (/** @type {import('leaflet').Layer} */ layer) => {
@@ -71,13 +79,7 @@
                 );
 
                 currentHazards.forEach((h) => {
-                    // Parse PostGIS point if needed, or assume lat/lng columns
-                    // For this mock, let's assume h.location is an object or we parse it
-                    // Real implementation needs PostGIS parsing
-                    // Mock parsing for demo: "POINT(lng lat)"
-                    let lat = -1.2921;
-                    let lng = 36.8219;
-
+                    let lat, lng;
                     if (
                         typeof h.location === "string" &&
                         h.location.startsWith("POINT")
@@ -95,17 +97,19 @@
                         lat = h.location.coordinates[1];
                     }
 
-                    const icon = L.divIcon({
-                        html: `<div class="marker-pin"></div>`,
-                        className: "custom-div-icon",
-                        iconSize: [30, 42],
-                        iconAnchor: [15, 42],
-                    });
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        const icon = L.divIcon({
+                            html: `<div style="background: #ef4444; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+                            className: "custom-div-icon",
+                            iconSize: [30, 42],
+                            iconAnchor: [15, 42],
+                        });
 
-                    const marker = L.marker([lat, lng]).addTo(map);
-                    marker.on("click", () => {
-                        selectedHazard.set(h);
-                    });
+                        const marker = L.marker([lat, lng]).addTo(map);
+                        marker.on("click", () => {
+                            selectedHazard.set(h);
+                        });
+                    }
                 });
             });
         }
@@ -120,79 +124,162 @@
         updateEndMarker();
     }
 
+    $: if (map && browser && hazardLocation) {
+        updateHazardMarker();
+    }
+
     async function updateStartMarker() {
         const L = await import("leaflet");
 
-        if (startMarker) {
-            map.removeLayer(startMarker);
-        }
-
         if (startLocation && startLocation.lat && startLocation.lng) {
-            const icon = L.divIcon({
-                html: `<div style="background: #22c55e; width: 12px; height: 12px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-                className: "",
-                iconSize: [18, 18],
-                iconAnchor: [9, 9],
-            });
-
-            startMarker = L.marker([startLocation.lat, startLocation.lng], {
-                icon,
-                draggable: true,
-            }).addTo(map);
-
-            // @ts-ignore
-            startMarker._isLocationMarker = true;
-
-            // Handle drag end event
-            startMarker.on("dragend", () => {
-                if (startMarker) {
-                    const pos = startMarker.getLatLng();
-                    dispatch("pinDropped", {
-                        type: "start",
-                        lat: pos.lat,
-                        lng: pos.lng,
-                        name: `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`,
-                    });
+            if (startMarker) {
+                // Update existing marker position
+                const curPos = startMarker.getLatLng();
+                // Only update if position is different (to avoid interfering with drag)
+                if (
+                    curPos.lat !== startLocation.lat ||
+                    curPos.lng !== startLocation.lng
+                ) {
+                    startMarker.setLatLng([
+                        startLocation.lat,
+                        startLocation.lng,
+                    ]);
                 }
-            });
+            } else {
+                // Create new marker
+                const icon = L.divIcon({
+                    html: `<div style="background: #22c55e; width: 24px; height: 24px; border-radius: 50%; border: 4px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.4); cursor: grab;"></div>`,
+                    className: "",
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12],
+                });
+
+                startMarker = L.marker([startLocation.lat, startLocation.lng], {
+                    icon,
+                    draggable: true,
+                    zIndexOffset: 1000,
+                }).addTo(map);
+
+                // @ts-ignore
+                startMarker._isLocationMarker = true;
+
+                startMarker.on("dragend", () => {
+                    if (startMarker) {
+                        const pos = startMarker.getLatLng();
+                        dispatch("pinDropped", {
+                            type: "start",
+                            lat: pos.lat,
+                            lng: pos.lng,
+                            name: `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`,
+                        });
+                    }
+                });
+            }
+        } else if (startMarker) {
+            map.removeLayer(startMarker);
+            startMarker = null;
         }
     }
 
     async function updateEndMarker() {
         const L = await import("leaflet");
 
-        if (endMarker) {
-            map.removeLayer(endMarker);
-        }
-
         if (endLocation && endLocation.lat && endLocation.lng) {
-            const icon = L.divIcon({
-                html: `<div style="background: #ef4444; width: 12px; height: 12px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-                className: "",
-                iconSize: [18, 18],
-                iconAnchor: [9, 9],
-            });
-
-            endMarker = L.marker([endLocation.lat, endLocation.lng], {
-                icon,
-                draggable: true,
-            }).addTo(map);
-
-            // @ts-ignore
-            endMarker._isLocationMarker = true;
-
-            // Handle drag end event
-            endMarker.on("dragend", () => {
-                if (endMarker) {
-                    const pos = endMarker.getLatLng();
-                    dispatch("pinDropped", {
-                        type: "end",
-                        lat: pos.lat,
-                        lng: pos.lng,
-                        name: `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`,
-                    });
+            if (endMarker) {
+                // Update existing marker position
+                const curPos = endMarker.getLatLng();
+                if (
+                    curPos.lat !== endLocation.lat ||
+                    curPos.lng !== endLocation.lng
+                ) {
+                    endMarker.setLatLng([endLocation.lat, endLocation.lng]);
                 }
-            });
+            } else {
+                // Create new marker
+                const icon = L.divIcon({
+                    html: `<div style="background: #ef4444; width: 24px; height: 24px; border-radius: 50%; border: 4px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.4); cursor: grab;"></div>`,
+                    className: "",
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12],
+                });
+
+                endMarker = L.marker([endLocation.lat, endLocation.lng], {
+                    icon,
+                    draggable: true,
+                    zIndexOffset: 1000,
+                }).addTo(map);
+
+                // @ts-ignore
+                endMarker._isLocationMarker = true;
+
+                endMarker.on("dragend", () => {
+                    if (endMarker) {
+                        const pos = endMarker.getLatLng();
+                        dispatch("pinDropped", {
+                            type: "end",
+                            lat: pos.lat,
+                            lng: pos.lng,
+                            name: `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`,
+                        });
+                    }
+                });
+            }
+        } else if (endMarker) {
+            map.removeLayer(endMarker);
+            endMarker = null;
+        }
+    }
+
+    async function updateHazardMarker() {
+        const L = await import("leaflet");
+
+        if (hazardLocation && hazardLocation.lat && hazardLocation.lng) {
+            if (hazardMarker) {
+                const curPos = hazardMarker.getLatLng();
+                if (
+                    curPos.lat !== hazardLocation.lat ||
+                    curPos.lng !== hazardLocation.lng
+                ) {
+                    hazardMarker.setLatLng([
+                        hazardLocation.lat,
+                        hazardLocation.lng,
+                    ]);
+                }
+            } else {
+                const icon = L.divIcon({
+                    html: `<div style="background: #f97316; width: 24px; height: 24px; border-radius: 50%; border: 4px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.4); cursor: grab;"></div>`,
+                    className: "",
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12],
+                });
+
+                hazardMarker = L.marker(
+                    [hazardLocation.lat, hazardLocation.lng],
+                    {
+                        icon,
+                        draggable: true,
+                        zIndexOffset: 1000,
+                    },
+                ).addTo(map);
+
+                // @ts-ignore
+                hazardMarker._isLocationMarker = true;
+
+                hazardMarker.on("dragend", () => {
+                    if (hazardMarker) {
+                        const pos = hazardMarker.getLatLng();
+                        dispatch("pinDropped", {
+                            type: "hazard",
+                            lat: pos.lat,
+                            lng: pos.lng,
+                            name: `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`,
+                        });
+                    }
+                });
+            }
+        } else if (hazardMarker) {
+            map.removeLayer(hazardMarker);
+            hazardMarker = null;
         }
     }
 
@@ -238,6 +325,7 @@
     }
 
     onDestroy(() => {
+        if (unsubscribeHazards) unsubscribeHazards();
         if (map) {
             map.remove();
         }

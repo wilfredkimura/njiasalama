@@ -36,6 +36,7 @@
      * @param {number} code
      */
     function getWeatherDescription(code) {
+        /** @type {Object.<number, string>} */
         const codes = {
             0: "Clear sky",
             1: "Mainly clear",
@@ -53,6 +54,8 @@
             73: "Moderate snow",
             75: "Heavy snow",
             95: "Thunderstorm",
+            96: "Thunderstorm with slight hail",
+            99: "Thunderstorm with heavy hail",
         };
         return codes[code] || "Unknown";
     }

@@ -12,5 +12,6 @@ export const routeState = writable({
     routeDistance: "0",
     routeDuration: 0,
     avgSpeed: 0,
-    showVibeCheck: false
+    showVibeCheck: false,
+    hazardsOnRoute: []
 });

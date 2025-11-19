@@ -13,9 +13,6 @@
     let mapComponent;
     let pinDropMode = "none"; // 'none' | 'start' | 'end'
 
-    // Subscribe to store for local ease of use, or use $routeState directly
-    // We'll use $routeState in template, but for logic inside functions we might need to read/update it.
-
     /**
      * @param {any} updates
      */
@@ -45,14 +42,12 @@
 
         if (startLocation.name && endLocation.name) {
             try {
-                // Request up to 3 alternatives to show more route options (including potential offroad paths)
                 const response = await fetch(
                     `https://router.project-osrm.org/route/v1/bike/${startLocation.lng},${startLocation.lat};${endLocation.lng},${endLocation.lat}?overview=full&geometries=geojson&alternatives=3`,
                 );
                 const data = await response.json();
 
                 if (data.routes && data.routes.length > 0) {
-                    // Process routes for Map component
                     const processedRoutes = data.routes.map(
                         (/** @type {any} */ r, /** @type {number} */ i) => ({
                             id: i,
@@ -79,14 +74,37 @@
         }
     }
 
-    // Auto-recalculate route when locations change (if both have valid coordinates)
+    let lastPlannedStart = { lat: 0, lng: 0 };
+    let lastPlannedEnd = { lat: 0, lng: 0 };
+
     $: if (
         $routeState.startLocation.lat &&
         $routeState.startLocation.lng &&
         $routeState.endLocation.lat &&
         $routeState.endLocation.lng
     ) {
-        planRoute();
+        const startChanged =
+            Math.abs($routeState.startLocation.lat - lastPlannedStart.lat) >
+                0.000001 ||
+            Math.abs($routeState.startLocation.lng - lastPlannedStart.lng) >
+                0.000001;
+        const endChanged =
+            Math.abs($routeState.endLocation.lat - lastPlannedEnd.lat) >
+                0.000001 ||
+            Math.abs($routeState.endLocation.lng - lastPlannedEnd.lng) >
+                0.000001;
+
+        if (startChanged || endChanged) {
+            lastPlannedStart = {
+                lat: $routeState.startLocation.lat,
+                lng: $routeState.startLocation.lng,
+            };
+            lastPlannedEnd = {
+                lat: $routeState.endLocation.lat,
+                lng: $routeState.endLocation.lng,
+            };
+            planRoute();
+        }
     }
 
     /**
@@ -95,57 +113,28 @@
      */
     function selectRoute(index, routesOverride) {
         const routes = routesOverride || $routeState.routes;
-        const route = routes[index];
-        const bikeType = $routeState.bikeType;
+        const selectedRoute = routes[index];
 
-        // Update Map
-        if (mapComponent) {
-            mapComponent.drawRoutes(routes, index);
-        }
+        if (selectedRoute) {
+            const speedKmh = $routeState.bikeType === "road" ? 25 : 18;
+            const distanceKm = selectedRoute.distance / 1000;
+            const durationMin = Math.round((distanceKm / speedKmh) * 60);
 
-        // Update Stats
-        const distKm = route.distance / 1000;
-        const distDisplay = distKm.toFixed(1); // km
+            const analysis = analyzeRouteHazards(selectedRoute);
 
-        // Realistic Speeds
-        // Road Bike: ~25 km/h (Commuter/Enthusiast mix)
-        // Mountain Bike: ~18 km/h (Mixed terrain/heavier bike)
-        const speed = bikeType === "road" ? 25 : 18;
-
-        // Calculate Duration based on Speed
-        // Time (min) = (Distance (km) / Speed (km/h)) * 60
-        const durMin = Math.round((distKm / speed) * 60);
-
-        // Calculate Confidence
-        const score = calculateConfidence(route.coordinates);
-
-        updateStore({
-            selectedRouteIndex: index,
-            routeDistance: distDisplay,
-            routeDuration: durMin,
-            confidenceScore: score,
-            avgSpeed: speed,
-        });
-    }
-
-    /**
-     * @param {CustomEvent} e
-     */
-    /**
-     * @param {CustomEvent} e
-     */
-    function handlePinDropped(e) {
-        const { type, lat, lng, name } = e.detail;
-        if (type === "start") {
             updateStore({
-                startLocation: { name, lat, lng },
+                selectedRouteIndex: index,
+                routeDistance: (selectedRoute.distance / 1000).toFixed(1),
+                routeDuration: durationMin,
+                avgSpeed: speedKmh,
+                confidenceScore: analysis.score,
+                hazardsOnRoute: analysis.hazards,
             });
-        } else if (type === "end") {
-            updateStore({
-                endLocation: { name, lat, lng },
-            });
+
+            if (mapComponent) {
+                mapComponent.drawRoutes(routes, index);
+            }
         }
-        pinDropMode = "none"; // Reset mode after dropping pin
     }
 
     /**
@@ -156,14 +145,54 @@
     }
 
     /**
-     * @param {number[][]} routeCoords
+     * @param {CustomEvent} e
      */
-    function calculateConfidence(routeCoords) {
-        const currentHazards = get(hazards);
+    function handlePinDropped(e) {
+        const { type, lat, lng, name } = e.detail;
+        if (type === "start") {
+            updateStore({
+                startLocation: {
+                    name,
+                    lat,
+                    lng,
+                },
+            });
+            pinDropMode = "none";
+        } else if (type === "end") {
+            updateStore({
+                endLocation: {
+                    name,
+                    lat,
+                    lng,
+                },
+            });
+            pinDropMode = "none";
+        }
+    }
+
+    /**
+     * @param {{parsedLat: number, parsedLng: number}} h
+     */
+    function focusHazard(h) {
+        if (h.parsedLat && h.parsedLng && $mapInstance) {
+            $mapInstance.flyTo([h.parsedLat, h.parsedLng], 18, {
+                animate: true,
+                duration: 1.5,
+            });
+        }
+    }
+
+    /**
+     * @param {{coordinates: number[][]}} route
+     */
+    function analyzeRouteHazards(route) {
         let hazardScore = 0;
+        const currentHazards = get(hazards);
+        const routeCoords = route.coordinates;
+        /** @type {any[]} */
+        const detectedHazards = [];
 
         currentHazards.forEach((h) => {
-            // Parse hazard location
             let hLat = 0,
                 hLng = 0;
             if (
@@ -183,7 +212,6 @@
                 hLat = h.location.coordinates[1];
             }
 
-            // Check if hazard is near the route
             const isNear = routeCoords.some(([rLat, rLng]) => {
                 return (
                     Math.abs(rLat - hLat) < 0.0005 &&
@@ -193,16 +221,23 @@
 
             if (isNear) {
                 hazardScore += (h.severity_rating || 1) * 5;
+                // @ts-ignore
+                detectedHazards.push({
+                    ...h,
+                    parsedLat: hLat,
+                    parsedLng: hLng,
+                });
             }
         });
 
-        return Math.max(0, 100 - hazardScore);
+        return {
+            score: Math.max(0, 100 - hazardScore),
+            hazards: detectedHazards,
+        };
     }
 
-    // Restore map state on mount
     onMount(() => {
         if ($routeState.routeFound && $routeState.routes.length > 0) {
-            // Small delay to ensure map is ready
             setTimeout(() => {
                 if (mapComponent) {
                     mapComponent.drawRoutes(
@@ -371,67 +406,132 @@
                 </div>
 
                 {#if $routeState.startLocation.lat && $routeState.startLocation.lng}
-                    <WeatherWidget
-                        lat={$routeState.startLocation.lat}
-                        lng={$routeState.startLocation.lng}
-                    />
+                    <div class="mt-2">
+                        <h3
+                            class="text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider"
+                        >
+                            Start Weather
+                        </h3>
+                        <WeatherWidget
+                            lat={$routeState.startLocation.lat}
+                            lng={$routeState.startLocation.lng}
+                        />
+                    </div>
+                {/if}
+
+                {#if $routeState.endLocation.lat && $routeState.endLocation.lng}
+                    <div class="mt-2">
+                        <h3
+                            class="text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider"
+                        >
+                            Destination Weather
+                        </h3>
+                        <WeatherWidget
+                            lat={$routeState.endLocation.lat}
+                            lng={$routeState.endLocation.lng}
+                        />
+                    </div>
+                {/if}
+
+                <button
+                    on:click={planRoute}
+                    class="w-full bg-black text-white py-4 rounded-xl font-bold text-lg mt-4 shadow-lg active:scale-95 transition-transform"
+                >
+                    {$routeState.routeFound ? "Update Route" : "Find Safe Path"}
+                </button>
+
+                {#if $routeState.routeFound}
+                    <div
+                        class="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-100"
+                    >
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-gray-500 text-sm">Distance</span>
+                            <span class="font-bold"
+                                >{$routeState.routeDistance} km</span
+                            >
+                        </div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-gray-500 text-sm">Est. Time</span>
+                            <span class="font-bold"
+                                >{$routeState.routeDuration} min</span
+                            >
+                        </div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-gray-500 text-sm">Est. Speed</span
+                            >
+                            <span class="font-bold"
+                                >{$routeState.avgSpeed || 0} km/h</span
+                            >
+                        </div>
+                        <div
+                            class="flex justify-between items-center pt-2 border-t border-gray-200"
+                        >
+                            <span class="text-gray-500 text-sm"
+                                >Safety Score</span
+                            >
+                            <span
+                                class={`font-bold ${$routeState.confidenceScore > 80 ? "text-green-600" : $routeState.confidenceScore > 50 ? "text-yellow-600" : "text-red-600"}`}
+                            >
+                                {$routeState.confidenceScore}%
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2 text-center">
+                            {$routeState.confidenceScore > 80
+                                ? "Route looks clear!"
+                                : "Hazards detected. Ride with caution."}
+                        </p>
+
+                        {#if $routeState.hazardsOnRoute && $routeState.hazardsOnRoute.length > 0}
+                            <details class="mt-3 group">
+                                <summary
+                                    class="flex justify-between items-center cursor-pointer text-sm font-medium text-orange-600 list-none bg-orange-50 p-2 rounded-lg hover:bg-orange-100 transition-colors"
+                                >
+                                    <div class="flex items-center gap-2">
+                                        <span>⚠️</span>
+                                        <span
+                                            >{$routeState.hazardsOnRoute.length}
+                                            Hazards Detected</span
+                                        >
+                                    </div>
+                                    <span
+                                        class="transition-transform group-open:rotate-180 text-xs"
+                                        >▼</span
+                                    >
+                                </summary>
+                                <div
+                                    class="mt-2 space-y-2 pl-2 max-h-40 overflow-y-auto"
+                                >
+                                    {#each $routeState.hazardsOnRoute as h}
+                                        <button
+                                            class="w-full text-left text-xs text-gray-600 flex items-center justify-between p-1 border-b border-gray-100 last:border-0 hover:bg-orange-50 cursor-pointer transition-colors"
+                                            on:click={() => focusHazard(h)}
+                                        >
+                                            <span class="font-bold capitalize"
+                                                >{h.hazard_type.replace(
+                                                    "_",
+                                                    " ",
+                                                )}</span
+                                            >
+                                            <span
+                                                class="text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full"
+                                                >Sev: {h.severity_rating}/5</span
+                                            >
+                                        </button>
+                                    {/each}
+                                </div>
+                            </details>
+                        {/if}
+                        {#if $routeState.routes.length > 1}
+                            <p
+                                class="text-xs text-blue-500 mt-2 text-center font-medium"
+                            >
+                                {$routeState.routes.length} routes found. Tap map
+                                to switch.
+                            </p>
+                        {/if}
+                    </div>
                 {/if}
             </div>
-
-            <button
-                on:click={planRoute}
-                class="w-full mt-4 bg-black text-white py-3 rounded-xl font-bold shadow-lg active:scale-95 transition-transform"
-            >
-                {$routeState.routeFound ? "Update Route" : "Find Safe Path"}
-            </button>
-
-            {#if $routeState.routeFound}
-                <div
-                    class="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-100"
-                >
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-gray-500 text-sm">Distance</span>
-                        <span class="font-bold"
-                            >{$routeState.routeDistance} km</span
-                        >
-                    </div>
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-gray-500 text-sm">Est. Time</span>
-                        <span class="font-bold"
-                            >{$routeState.routeDuration} min</span
-                        >
-                    </div>
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-gray-500 text-sm">Est. Speed</span>
-                        <span class="font-bold"
-                            >{$routeState.avgSpeed || 0} km/h</span
-                        >
-                    </div>
-                    <div
-                        class="flex justify-between items-center pt-2 border-t border-gray-200"
-                    >
-                        <span class="text-gray-500 text-sm">Safety Score</span>
-                        <span
-                            class={`font-bold ${$routeState.confidenceScore > 80 ? "text-green-600" : $routeState.confidenceScore > 50 ? "text-yellow-600" : "text-red-600"}`}
-                        >
-                            {$routeState.confidenceScore}%
-                        </span>
-                    </div>
-                    <p class="text-xs text-gray-400 mt-2 text-center">
-                        {$routeState.confidenceScore > 80
-                            ? "Route looks clear!"
-                            : "Hazards detected. Ride with caution."}
-                    </p>
-                    {#if $routeState.routes.length > 1}
-                        <p
-                            class="text-xs text-blue-500 mt-2 text-center font-medium"
-                        >
-                            {$routeState.routes.length} routes found. Tap map to
-                            switch.
-                        </p>
-                    {/if}
-                </div>
-            {/if}
         </div>
     {:else}
         <!-- Collapsed View -->

@@ -18,16 +18,15 @@
         { id: "other", label: "Other", icon: "❓" },
     ];
 
+    export let location = { lat: -1.2921, lng: 36.8219 }; // Default to Nairobi if not provided
+
     async function handleSubmit() {
         loading = true;
-        // In a real app, we'd get the location from the map center or user location
-        // For now, we'll mock it or pass it in as a prop
-        const location = { type: "Point", coordinates: [36.8219, -1.2921] }; // Mock Nairobi
 
         const newHazard = {
             hazard_type: type,
             severity_rating: severity,
-            location: `POINT(${location.coordinates[0]} ${location.coordinates[1]})`, // PostGIS format
+            location: `POINT(${location.lng} ${location.lat})`, // PostGIS format: POINT(lng lat)
             // user_id would be handled by RLS/Auth
         };
 

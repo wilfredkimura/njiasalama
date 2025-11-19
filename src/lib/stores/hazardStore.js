@@ -1,5 +1,6 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import { supabase } from '../supabaseClient';
+import { browser } from '$app/environment';
 
 /**
  * @typedef {Object} Hazard
@@ -12,22 +13,56 @@ import { supabase } from '../supabaseClient';
  * @property {boolean} [is_active]
  */
 
+// Initialize from LocalStorage if available
+const storedHazards = browser ? JSON.parse(localStorage.getItem('hazards') || '[]') : [];
+
 /** @type {import('svelte/store').Writable<Hazard[]>} */
-export const hazards = writable([]);
+export const hazards = writable(storedHazards);
+
+// Subscribe to changes and save to LocalStorage
+if (browser) {
+    hazards.subscribe(value => {
+        localStorage.setItem('hazards', JSON.stringify(value));
+    });
+}
 
 /** @type {import('svelte/store').Writable<Hazard | null>} */
 export const selectedHazard = writable(null);
 
 export const fetchHazards = async () => {
-    const { data, error } = await supabase
-        .from('hazards')
-        .select('*')
-        .eq('is_active', true);
+    try {
+        const { data, error } = await supabase
+            .from('hazards')
+            .select('*')
+            .eq('is_active', true);
 
-    if (error) {
-        console.error('Error fetching hazards:', error);
-    } else if (data) {
-        hazards.set(data);
+        if (error) throw error;
+        if (data) {
+            hazards.set(data);
+        }
+    } catch (error) {
+        console.warn('Supabase connection failed, falling back to local data:', error);
+        // If LocalStorage is empty, seed with mock data
+        if (get(hazards).length === 0) {
+            hazards.set([
+                {
+                    id: 'mock-1',
+                    hazard_type: 'pothole',
+                    severity_rating: 4,
+                    location: 'POINT(36.8219 -1.2921)', // Nairobi
+                    created_at: new Date().toISOString(),
+                    is_active: true
+                },
+                {
+                    id: 'mock-2',
+                    hazard_type: 'no_light',
+                    severity_rating: 3,
+                    location: 'POINT(36.8250 -1.2950)',
+                    created_at: new Date().toISOString(),
+                    is_active: true
+                }
+            ]);
+        }
     }
 };
 
@@ -35,17 +70,27 @@ export const fetchHazards = async () => {
  * @param {Hazard} hazard
  */
 export const addHazard = async (hazard) => {
-    const { data, error } = await supabase
-        .from('hazards')
-        .insert([hazard])
-        .select();
+    // Optimistic update (add to store immediately)
+    const tempId = `temp-${Date.now()}`;
+    const tempHazard = { ...hazard, id: tempId, created_at: new Date().toISOString(), is_active: true };
+    hazards.update(current => [...current, tempHazard]);
 
-    if (error) {
-        console.error('Error adding hazard:', error);
-        return null;
-    } else if (data) {
-        hazards.update(current => [...current, data[0]]);
-        return data[0];
+    try {
+        const { data, error } = await supabase
+            .from('hazards')
+            .insert([hazard])
+            .select();
+
+        if (error) throw error;
+        if (data) {
+            // Replace temp hazard with real one
+            hazards.update(current => current.map(h => h.id === tempId ? data[0] : h));
+            return data[0];
+        }
+    } catch (error) {
+        console.warn('Supabase connection failed, keeping local data');
+        // We keep the temp hazard in the store (and thus LocalStorage)
+        return tempHazard;
     }
     return null;
 };
