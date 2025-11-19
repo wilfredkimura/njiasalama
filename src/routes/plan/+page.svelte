@@ -12,6 +12,8 @@
     /** @type {Map} */
     let mapComponent;
     let pinDropMode = "none"; // 'none' | 'start' | 'end'
+    /** @type {{lat: number, lng: number, name: string} | null} */
+    let userLocation = null; // Store user's current location
     import UserMenu from "$lib/components/UserMenu.svelte";
 
     /**
@@ -158,7 +160,8 @@
                     lng,
                 },
             });
-            pinDropMode = "none";
+            // After placing start pin, prompt for end pin
+            pinDropMode = "end";
         } else if (type === "end") {
             updateStore({
                 endLocation: {
@@ -169,6 +172,70 @@
             });
             pinDropMode = "none";
         }
+    }
+
+    function getCurrentLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    userLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        name: `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`,
+                    };
+                },
+                (error) => {
+                    console.error("Geolocation error:", error);
+                    alert(
+                        "Could not get your location. Please enable location services.",
+                    );
+                },
+            );
+        } else {
+            alert("Geolocation is not supported by your browser.");
+        }
+    }
+
+    /**
+     * @param {'start' | 'end'} type
+     */
+    function useCurrentLocationFor(type) {
+        if (!userLocation) {
+            getCurrentLocation();
+            setTimeout(() => {
+                if (userLocation) {
+                    setLocationFromCurrent(type);
+                }
+            }, 1000);
+        } else {
+            setLocationFromCurrent(type);
+        }
+    }
+
+    /**
+     * @param {'start' | 'end'} type
+     */
+    function setLocationFromCurrent(type) {
+        if (!userLocation) return;
+
+        if (type === "start") {
+            updateStore({
+                startLocation: userLocation,
+            });
+        } else {
+            updateStore({
+                endLocation: userLocation,
+            });
+        }
+    }
+
+    /**
+     * @param {'start' | 'end'} type
+     */
+    function activatePinDrop(type) {
+        pinDropMode = type;
+        // Collapse the form when pin drop is activated
+        updateStore({ isCollapsed: true });
     }
 
     /**
@@ -349,11 +416,9 @@
                         on:select={(e) => handleSelect(e, "start")}
                     />
                     <button
-                        on:click={() =>
-                            (pinDropMode =
-                                pinDropMode === "start" ? "none" : "start")}
-                        class={`p-2 rounded-lg transition-colors shrink-0 ${pinDropMode === "start" ? "bg-green-500 text-white" : "bg-white hover:bg-gray-100"}`}
-                        title="Drop pin on map"
+                        on:click={() => useCurrentLocationFor("start")}
+                        class="p-2 rounded-lg transition-colors shrink-0 bg-white hover:bg-gray-100"
+                        title="Use current location"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -375,6 +440,26 @@
                             />
                         </svg>
                     </button>
+                    <button
+                        on:click={() => activatePinDrop("start")}
+                        class={`p-2 rounded-lg transition-colors shrink-0 ${pinDropMode === "start" ? "bg-green-500 text-white" : "bg-white hover:bg-gray-100"}`}
+                        title="Drop pin on map"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke-width="1.5"
+                            stroke="currentColor"
+                            class="w-5 h-5"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"
+                            />
+                        </svg>
+                    </button>
                 </div>
                 <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-xl">
                     <div class="w-3 h-3 rounded-full bg-red-500 shrink-0"></div>
@@ -384,11 +469,9 @@
                         on:select={(e) => handleSelect(e, "end")}
                     />
                     <button
-                        on:click={() =>
-                            (pinDropMode =
-                                pinDropMode === "end" ? "none" : "end")}
-                        class={`p-2 rounded-lg transition-colors shrink-0 ${pinDropMode === "end" ? "bg-red-500 text-white" : "bg-white hover:bg-gray-100"}`}
-                        title="Drop pin on map"
+                        on:click={() => useCurrentLocationFor("end")}
+                        class="p-2 rounded-lg transition-colors shrink-0 bg-white hover:bg-gray-100"
+                        title="Use current location"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -407,6 +490,26 @@
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
                                 d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
+                            />
+                        </svg>
+                    </button>
+                    <button
+                        on:click={() => activatePinDrop("end")}
+                        class={`p-2 rounded-lg transition-colors shrink-0 ${pinDropMode === "end" ? "bg-red-500 text-white" : "bg-white hover:bg-gray-100"}`}
+                        title="Drop pin on map"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke-width="1.5"
+                            stroke="currentColor"
+                            class="w-5 h-5"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z"
                             />
                         </svg>
                     </button>
