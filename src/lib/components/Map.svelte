@@ -48,6 +48,34 @@
 
             mapInstance.set(map);
 
+            // Get user location
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        // Only set view if no route is being displayed
+                        if (routeLayers.length === 0) {
+                            map.setView([latitude, longitude], 15);
+                        }
+
+                        // Add user location marker
+                        const userIcon = L.divIcon({
+                            html: `<div style="background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+                            className: "",
+                            iconSize: [16, 16],
+                            iconAnchor: [8, 8],
+                        });
+
+                        L.marker([latitude, longitude], {
+                            icon: userIcon,
+                        }).addTo(map);
+                    },
+                    (error) => {
+                        console.warn("Geolocation failed:", error);
+                    },
+                );
+            }
+
             // Handle map clicks for pin dropping
             map.on("click", (/** @type {any} */ e) => {
                 if (pinDropMode !== "none") {
@@ -71,7 +99,9 @@
                         // @ts-ignore
                         if (
                             layer instanceof L.Marker &&
-                            !layer._isLocationMarker
+                            !layer._isLocationMarker &&
+                            // @ts-ignore
+                            !layer._isUserLocation // Don't remove user marker
                         ) {
                             map.removeLayer(layer);
                         }
@@ -99,10 +129,10 @@
 
                     if (!isNaN(lat) && !isNaN(lng)) {
                         const icon = L.divIcon({
-                            html: `<div style="background: #f97316; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.3);"></div>`,
-                            className: "custom-div-icon",
-                            iconSize: [14, 14],
-                            iconAnchor: [7, 7],
+                            html: `<div style="background-color: #f97316; width: 100%; height: 100%; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+                            className: "",
+                            iconSize: [12, 12],
+                            iconAnchor: [6, 6],
                         });
 
                         const marker = L.marker([lat, lng]).addTo(map);
@@ -297,9 +327,10 @@
 
             routes.forEach((route, index) => {
                 const isActive = index === activeIndex;
-                const color = isActive ? "#2563eb" : "#9ca3af"; // blue-600 : gray-400
-                const opacity = isActive ? 0.9 : 0.6;
+                const color = isActive ? "#2563eb" : "#4b5563"; // blue-600 : gray-600 (darker)
+                const opacity = isActive ? 0.9 : 0.7;
                 const weight = isActive ? 6 : 5;
+                const zIndex = isActive ? 1000 : 500;
 
                 const polyline = L.polyline(route.coordinates, {
                     color: color,
@@ -317,6 +348,8 @@
                 if (isActive) {
                     polyline.bringToFront();
                     map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+                } else {
+                    polyline.bringToBack();
                 }
 
                 routeLayers.push(polyline);

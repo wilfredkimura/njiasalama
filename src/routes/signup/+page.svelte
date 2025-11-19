@@ -22,8 +22,8 @@
             error = err.message;
             loading = false;
         } else {
-            message = "Check your email for the confirmation link!";
-            loading = false;
+            // Assuming email confirmation is disabled in Supabase
+            goto("/");
         }
     }
 </script>

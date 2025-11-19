@@ -511,7 +511,10 @@
                                     {#each $routeState.hazardsOnRoute as h}
                                         <button
                                             class="w-full text-left text-xs text-gray-600 flex items-center justify-between p-1 border-b border-gray-100 last:border-0 hover:bg-orange-50 cursor-pointer transition-colors"
-                                            on:click={() => focusHazard(h)}
+                                            on:click={() =>
+                                                focusHazard(
+                                                    /** @type {any} */ (h),
+                                                )}
                                         >
                                             <span class="font-bold capitalize"
                                                 >{h.hazard_type.replace(

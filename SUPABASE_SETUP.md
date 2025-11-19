@@ -1,18 +1,3 @@
-# Supabase Setup Guide
-
-Follow these steps to set up your Supabase backend for Njia Salama.
-
-## 1. Create a Supabase Project
-
-1.  Go to [supabase.com](https://supabase.com) and sign in.
-2.  Click "New Project".
-3.  Choose your organization, give your project a name (e.g., "Njia Salama"), and set a strong database password.
-4.  Select a region close to your users.
-5.  Click "Create new project".
-
-## 2. Get API Keys
-
-1.  Once your project is ready, go to **Project Settings** (cog icon) > **API**.
 2.  Copy the `Project URL` and `anon` public key.
 3.  Update your `.env` file (and Vercel environment variables) with these values:
 
@@ -105,6 +90,38 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- Hazard Votes Table
+create table public.hazard_votes (
+  id uuid not null default gen_random_uuid (),
+  created_at timestamp with time zone not null default now(),
+  hazard_id uuid references public.hazards not null,
+  user_id uuid references auth.users not null default auth.uid(),
+  vote_type text not null check (vote_type in ('still_here', 'fixed')),
+  constraint hazard_votes_pkey primary key (id),
+  constraint hazard_votes_user_hazard_unique unique (hazard_id, user_id)
+);
+
+alter table public.hazard_votes enable row level security;
+
+create policy "Enable read access for all users" on public.hazard_votes for select using (true);
+create policy "Enable insert for authenticated users only" on public.hazard_votes for insert with check (auth.uid() = user_id);
+create policy "Enable update for users based on user_id" on public.hazard_votes for update using (auth.uid() = user_id);
+
+-- Hazard Comments Table
+create table public.hazard_comments (
+  id uuid not null default gen_random_uuid (),
+  created_at timestamp with time zone not null default now(),
+  hazard_id uuid references public.hazards not null,
+  user_id uuid references auth.users not null default auth.uid(),
+  content text not null,
+  constraint hazard_comments_pkey primary key (id)
+);
+
+alter table public.hazard_comments enable row level security;
+
+create policy "Enable read access for all users" on public.hazard_comments for select using (true);
+create policy "Enable insert for authenticated users only" on public.hazard_comments for insert with check (auth.uid() = user_id);
 ```
 
 ## 4. Enable PostGIS
