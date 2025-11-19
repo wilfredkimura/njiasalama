@@ -1,6 +1,7 @@
 <script>
     import { createEventDispatcher } from "svelte";
     import { addHazard } from "../stores/hazardStore";
+    import { user } from "../stores/authStore";
 
     const dispatch = createEventDispatcher();
 
@@ -27,7 +28,8 @@
             hazard_type: type,
             severity_rating: severity,
             location: `POINT(${location.lng} ${location.lat})`, // PostGIS format: POINT(lng lat)
-            // user_id would be handled by RLS/Auth
+            created_by: $user ? $user.id : null,
+            description: comment,
         };
 
         await addHazard(newHazard);
