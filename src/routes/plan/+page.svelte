@@ -12,6 +12,7 @@
     /** @type {Map} */
     let mapComponent;
     let pinDropMode = "none"; // 'none' | 'start' | 'end'
+    import UserMenu from "$lib/components/UserMenu.svelte";
 
     /**
      * @param {any} updates
@@ -262,11 +263,14 @@
 
     {#if !$routeState.isCollapsed}
         <div
-            class="fixed top-4 left-4 right-4 bg-white p-4 rounded-2xl shadow-lg z-[500] transition-all duration-300 ease-in-out max-h-[90vh] overflow-y-auto"
+            class="fixed top-4 left-4 right-4 bg-white/80 backdrop-blur-xl p-4 rounded-2xl shadow-lg z-[500] transition-all duration-300 ease-in-out max-h-[90vh] overflow-y-auto border border-white/40"
         >
             <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-2">
-                    <a href="/" class="p-2 hover:bg-gray-100 rounded-full">
+                    <a
+                        href="/"
+                        class="p-2 hover:bg-black/5 rounded-full transition-colors"
+                    >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
@@ -284,27 +288,30 @@
                     </a>
                     <h1 class="font-bold text-xl">Plan Ride</h1>
                 </div>
-                {#if $routeState.routeFound}
-                    <button
-                        on:click={() => updateStore({ isCollapsed: true })}
-                        class="p-2 hover:bg-gray-100 rounded-full text-gray-500"
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke-width="1.5"
-                            stroke="currentColor"
-                            class="w-6 h-6"
+                <div class="flex items-center gap-2">
+                    <UserMenu />
+                    {#if $routeState.routeFound}
+                        <button
+                            on:click={() => updateStore({ isCollapsed: true })}
+                            class="p-2 hover:bg-black/5 rounded-full text-gray-500 transition-colors"
                         >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                d="M4.5 15.75l7.5-7.5 7.5 7.5"
-                            />
-                        </svg>
-                    </button>
-                {/if}
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke-width="1.5"
+                                stroke="currentColor"
+                                class="w-6 h-6"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M4.5 15.75l7.5-7.5 7.5 7.5"
+                                />
+                            </svg>
+                        </button>
+                    {/if}
+                </div>
             </div>
 
             <div class="space-y-3">
@@ -536,7 +543,7 @@
     {:else}
         <!-- Collapsed View -->
         <div
-            class="fixed top-4 left-4 right-4 bg-white p-4 rounded-2xl shadow-lg z-[500] flex items-center justify-between cursor-pointer"
+            class="fixed top-4 left-4 right-4 bg-white/80 backdrop-blur-xl p-4 rounded-2xl shadow-lg z-[500] flex items-center justify-between cursor-pointer border border-white/40"
             role="button"
             tabindex="0"
             on:click={() => updateStore({ isCollapsed: false })}

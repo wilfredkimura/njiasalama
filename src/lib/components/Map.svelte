@@ -99,10 +99,10 @@
 
                     if (!isNaN(lat) && !isNaN(lng)) {
                         const icon = L.divIcon({
-                            html: `<div style="background: #ef4444; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+                            html: `<div style="background: #f97316; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.3);"></div>`,
                             className: "custom-div-icon",
-                            iconSize: [30, 42],
-                            iconAnchor: [15, 42],
+                            iconSize: [14, 14],
+                            iconAnchor: [7, 7],
                         });
 
                         const marker = L.marker([lat, lng]).addTo(map);

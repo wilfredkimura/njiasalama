@@ -1,6 +1,7 @@
 <script>
     import { supabase } from "$lib/supabaseClient";
     import { goto } from "$app/navigation";
+    import Navbar from "$lib/components/Navbar.svelte";
 
     let email = "";
     let password = "";
@@ -23,6 +24,8 @@
         }
     }
 </script>
+
+<Navbar />
 
 <div class="min-h-screen flex items-center justify-center bg-gray-50 px-4">
     <div class="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-xl">

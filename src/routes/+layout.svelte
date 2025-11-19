@@ -11,23 +11,16 @@
   });
 </script>
 
-<div class="fixed top-20 right-4 z-[1000]">
-  {#if $user}
-    <button
-      on:click={signOut}
-      class="bg-white/90 backdrop-blur text-black px-3 py-1 rounded-full shadow-sm text-xs font-bold hover:bg-gray-100 border border-gray-200"
-    >
-      Sign Out
-    </button>
-  {:else}
-    <a
-      href="/login"
-      class="bg-black text-white px-3 py-1 rounded-full shadow-sm text-xs font-bold hover:bg-gray-800"
-    >
-      Login
-    </a>
-  {/if}
-</div>
-
 <slot />
 <HazardSheet />
+
+<div
+  class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[1000] bg-white/70 backdrop-blur-md px-4 py-2 rounded-full shadow-sm border border-white/40 text-xs text-gray-600 pointer-events-auto"
+>
+  Made by <a
+    href="https://wilfredkimuraportfolio.vercel.app"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="font-semibold text-black hover:underline">Kimura Mutahi</a
+  > 2025
+</div>
