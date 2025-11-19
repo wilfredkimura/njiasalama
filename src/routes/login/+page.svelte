@@ -20,7 +20,8 @@
             error = err.message;
             loading = false;
         } else {
-            goto("/plan");
+            // Force a full page reload to ensure auth state is updated
+            window.location.href = "/";
         }
     }
 </script>
