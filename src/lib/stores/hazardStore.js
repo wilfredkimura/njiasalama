@@ -33,8 +33,7 @@ export const fetchHazards = async () => {
     try {
         const { data, error } = await supabase
             .from('hazards')
-            .select('*')
-            .eq('is_active', true);
+            .select('*');
 
         if (error) throw error;
         if (data) {
@@ -46,20 +45,18 @@ export const fetchHazards = async () => {
         if (get(hazards).length === 0) {
             hazards.set([
                 {
-                    id: 'mock-1',
+                    id: '00000000-0000-0000-0000-000000000001',
                     hazard_type: 'pothole',
                     severity_rating: 4,
                     location: 'POINT(36.8219 -1.2921)', // Nairobi
-                    created_at: new Date().toISOString(),
-                    is_active: true
+                    created_at: new Date().toISOString()
                 },
                 {
-                    id: 'mock-2',
+                    id: '00000000-0000-0000-0000-000000000002',
                     hazard_type: 'no_light',
                     severity_rating: 3,
                     location: 'POINT(36.8250 -1.2950)',
-                    created_at: new Date().toISOString(),
-                    is_active: true
+                    created_at: new Date().toISOString()
                 }
             ]);
         }
@@ -72,7 +69,7 @@ export const fetchHazards = async () => {
 export const addHazard = async (hazard) => {
     // Optimistic update (add to store immediately)
     const tempId = `temp-${Date.now()}`;
-    const tempHazard = { ...hazard, id: tempId, created_at: new Date().toISOString(), is_active: true };
+    const tempHazard = { ...hazard, id: tempId, created_at: new Date().toISOString() };
     hazards.update(current => [...current, tempHazard]);
 
     try {
