@@ -135,7 +135,9 @@
                             iconAnchor: [6, 6],
                         });
 
-                        const marker = L.marker([lat, lng]).addTo(map);
+                        const marker = L.marker([lat, lng], { icon }).addTo(
+                            map,
+                        );
                         marker.on("click", () => {
                             selectedHazard.set(h);
                         });

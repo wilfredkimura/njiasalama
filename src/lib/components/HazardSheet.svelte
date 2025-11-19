@@ -132,14 +132,19 @@
                 content,
                 created_at,
                 user_id,
-                profiles:user_id (username)
+                profiles!user_id (username)
             `,
             )
             .eq("hazard_id", hazardId)
             .order("created_at", { ascending: false });
 
+        if (error) {
+            console.error("Error fetching comments:", error);
+        }
+
         if (data) {
             comments = data;
+            console.log("Fetched comments:", data);
         }
     }
 

@@ -113,7 +113,7 @@ create table public.hazard_comments (
   id uuid not null default gen_random_uuid (),
   created_at timestamp with time zone not null default now(),
   hazard_id uuid references public.hazards not null,
-  user_id uuid references auth.users not null default auth.uid(),
+  user_id uuid references public.profiles not null default auth.uid(),
   content text not null,
   constraint hazard_comments_pkey primary key (id)
 );
