@@ -57,22 +57,58 @@
                         lat: position.coords.latitude,
                         lng: position.coords.longitude,
                     };
+                    console.log("User location obtained:", userLocation);
                     filterNearbyHazards();
                 },
                 (error) => {
                     console.error("Geolocation error:", error);
+                    // Set a default location (Nairobi CBD) if geolocation fails
+                    userLocation = {
+                        lat: -1.2864,
+                        lng: 36.8172,
+                    };
+                    console.log(
+                        "Using default location (Nairobi CBD):",
+                        userLocation,
+                    );
+                    filterNearbyHazards();
                 },
             );
+        } else {
+            console.warn("Geolocation not supported, using default location");
+            // Set default location if geolocation is not supported
+            userLocation = {
+                lat: -1.2864,
+                lng: 36.8172,
+            };
+            filterNearbyHazards();
         }
     }
 
     function filterNearbyHazards() {
-        if (!userLocation) return;
+        if (!userLocation) {
+            console.warn("Cannot filter hazards: userLocation is null");
+            return;
+        }
+
+        if (!$hazards || $hazards.length === 0) {
+            console.warn("Cannot filter hazards: no hazards available");
+            nearbyHazards = [];
+            return;
+        }
+
+        console.log(
+            `Filtering ${$hazards.length} hazards for location:`,
+            userLocation,
+        );
 
         nearbyHazards = $hazards
             .map((h) => {
                 const loc = parseLocation(h.location);
-                if (!loc) return null;
+                if (!loc) {
+                    console.warn("Could not parse location for hazard:", h.id);
+                    return null;
+                }
 
                 const distance = calculateDistance(
                     userLocation.lat,
@@ -89,9 +125,12 @@
             })
             .filter((h) => h && h.distance <= 100) // Within 100km
             .sort((a, b) => (a?.distance || 0) - (b?.distance || 0)); // Sort by distance
+
+        console.log(`Found ${nearbyHazards.length} hazards within 100km`);
     }
 
     $: if ($hazards && userLocation) {
+        console.log("Reactive update triggered - hazards or location changed");
         filterNearbyHazards();
     }
 

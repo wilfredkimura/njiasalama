@@ -30,6 +30,7 @@ if (browser) {
 export const selectedHazard = writable(null);
 
 export const fetchHazards = async () => {
+    console.log('Fetching hazards from Supabase...');
     try {
         const { data, error } = await supabase
             .from('hazards')
@@ -37,6 +38,7 @@ export const fetchHazards = async () => {
 
         if (error) throw error;
         if (data) {
+            console.log(`Successfully fetched ${data.length} hazards from Supabase`);
             hazards.set(data);
         }
     } catch (error) {
