@@ -37,11 +37,11 @@
 
     /**
      * Parse PostGIS POINT format
-     * @param {string} location
+     * @param {string | any} location
      * @returns {{lat: number, lng: number} | null}
      */
     function parseLocation(location) {
-        if (!location) return null;
+        if (!location || typeof location !== "string") return null;
         const match = location.match(/POINT\(([^ ]+) ([^ ]+)\)/);
         if (match) {
             return { lng: parseFloat(match[1]), lat: parseFloat(match[2]) };
@@ -241,6 +241,21 @@
         </div>
     </div>
 
+    <!-- Mobile Weather Widget (Floating) -->
+    {#if weather}
+        <div
+            class="md:hidden fixed top-20 right-4 bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg z-[500] border border-white/40 px-4 py-2 flex items-center gap-2"
+        >
+            <span class="text-2xl">{weather.icon}</span>
+            <div class="flex flex-col">
+                <span class="text-lg font-bold text-gray-900"
+                    >{weather.temp}°C</span
+                >
+                <span class="text-xs text-gray-500">Current</span>
+            </div>
+        </div>
+    {/if}
+
     <!-- Nearby Hazards List (Floating) -->
     {#if showHazardList}
         <div
@@ -393,6 +408,7 @@
 
         <!-- Popup -->
         <div
+            on:click|stopPropagation
             transition:fly={{ y: 50, duration: 300 }}
             class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-lg bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 z-[1000] border border-white/40"
         >
