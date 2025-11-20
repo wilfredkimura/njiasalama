@@ -36,16 +36,37 @@
     }
 
     /**
-     * Parse PostGIS POINT format
+     * Parse PostGIS POINT format (handles multiple formats)
      * @param {string | any} location
      * @returns {{lat: number, lng: number} | null}
      */
     function parseLocation(location) {
-        if (!location || typeof location !== "string") return null;
-        const match = location.match(/POINT\(([^ ]+) ([^ ]+)\)/);
-        if (match) {
-            return { lng: parseFloat(match[1]), lat: parseFloat(match[2]) };
+        if (!location) {
+            console.warn("parseLocation: location is null or undefined");
+            return null;
         }
+
+        // Handle GeoJSON format (object with coordinates)
+        if (typeof location === "object" && location.coordinates) {
+            const [lng, lat] = location.coordinates;
+            if (typeof lng === "number" && typeof lat === "number") {
+                return { lng, lat };
+            }
+        }
+
+        // Handle string format POINT(lng lat)
+        if (typeof location === "string") {
+            const match = location.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+            if (match) {
+                return { lng: parseFloat(match[1]), lat: parseFloat(match[2]) };
+            }
+        }
+
+        console.warn(
+            "parseLocation: Could not parse location format:",
+            typeof location,
+            location,
+        );
         return null;
     }
 

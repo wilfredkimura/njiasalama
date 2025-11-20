@@ -34,12 +34,27 @@ export const fetchHazards = async () => {
     try {
         const { data, error } = await supabase
             .from('hazards')
-            .select('*');
+            .select('id, hazard_type, severity_rating, description, created_at, created_by, location');
 
         if (error) throw error;
         if (data) {
             console.log(`Successfully fetched ${data.length} hazards from Supabase`);
-            hazards.set(data);
+
+            // Convert PostGIS geometry to text format for each hazard
+            const processedData = data.map(hazard => {
+                // If location is an object (binary geometry), convert it
+                if (hazard.location && typeof hazard.location === 'object') {
+                    // PostGIS returns geometry as an object with coordinates
+                    // We need to convert it to POINT(lng lat) format
+                    if (hazard.location.coordinates) {
+                        const [lng, lat] = hazard.location.coordinates;
+                        hazard.location = `POINT(${lng} ${lat})`;
+                    }
+                }
+                return hazard;
+            });
+
+            hazards.set(processedData);
         }
     } catch (error) {
         console.warn('Supabase connection failed, falling back to local data:', error);
